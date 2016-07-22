@@ -18,49 +18,53 @@ import com.microsoft.band.BandIOException;
 import com.microsoft.band.BandInfo;
 import com.microsoft.band.ConnectionState;
 import com.microsoft.band.UserConsent;
+import com.microsoft.band.sensors.BandDistanceEvent;
+import com.microsoft.band.sensors.BandDistanceEventListener;
+import com.microsoft.band.sensors.BandGsrEvent;
+import com.microsoft.band.sensors.BandGsrEventListener;
 import com.microsoft.band.sensors.BandHeartRateEvent;
 import com.microsoft.band.sensors.BandHeartRateEventListener;
 import com.microsoft.band.sensors.HeartRateConsentListener;
-import com.microsoft.band.sensors.SampleRate;
-import com.microsoft.band.sensors.BandGyroscopeEvent;
-import com.microsoft.band.sensors.BandGyroscopeEventListener;
-import com.microsoft.band.sensors.BandAccelerometerEvent;
-import com.microsoft.band.sensors.BandAccelerometerEventListener;
-
-
-
-import java.lang.ref.WeakReference;
+import com.microsoft.band.sensors.BandRRIntervalEvent;
+import com.microsoft.band.sensors.BandRRIntervalEventListener;
 
 public class MainActivity extends AppCompatActivity {
     private BandClient client = null;
-    private Button btnStart, btnConsent, btnAcc, btnGyro;
-    private TextView txtStatus, txtAcc, txtGyro;
+    private Button btnStart, btnConsent, btnMtn, btnRRI, btnGsr;
+    private TextView txtStatus, txtMtn, txtRRI, txtGsr;
 
     private BandHeartRateEventListener mHeartRateEventListener = new BandHeartRateEventListener() {
         @Override
         public void onBandHeartRateChanged(final BandHeartRateEvent event) {
             if (event != null) {
-                appendToUI(String.format("Heart Rate = %d beats per minute\n", event.getHeartRate()));
+                appendToUI(String.format("%d beats per minute\n", event.getHeartRate()));
             }
         }
     };
 
-    private BandAccelerometerEventListener mAccelerometerEventListener = new BandAccelerometerEventListener() {
+    private BandRRIntervalEventListener mRRIntervalEventListener = new BandRRIntervalEventListener() {
         @Override
-        public void onBandAccelerometerChanged(BandAccelerometerEvent event) {
-            if (event != null){
-                appendToUI_Acc(String.format(" X = %.3f \n Y = %.3f\n Z = %.3f", event.getAccelerationX(),
-                        event.getAccelerationY(), event.getAccelerationZ()));
+        public void onBandRRIntervalChanged(final BandRRIntervalEvent event) {
+            if (event != null) {
+                appendToUI_RR(String.format("RR Interval = %.3f s\n", event.getInterval()));
             }
         }
     };
 
-    private BandGyroscopeEventListener mGyroscopeEventListener = new BandGyroscopeEventListener() {
+    private BandGsrEventListener mGsrEventListener = new BandGsrEventListener() {
         @Override
-        public void onBandGyroscopeChanged(BandGyroscopeEvent event) {
-            if (event != null){
-                appendToUI_Gyro(String.format(" X = %.3f \n Y = %.3f\n Z = %.3f", event.getAngularVelocityX(),
-                        event.getAngularVelocityY(), event.getAngularVelocityZ()));
+        public void onBandGsrChanged(final BandGsrEvent event) {
+            if (event != null) {
+                appendToUI_Gsr(String.format("Resistance = %d kOhms\n", event.getResistance()));
+            }
+        }
+    };
+
+    private BandDistanceEventListener mDistanceListener = new BandDistanceEventListener() {
+        @Override
+        public void onBandDistanceChanged(BandDistanceEvent event) {
+            if (event != null) {
+                appendToUI_Dist(String.format("Motion: " + event.getMotionType()));
             }
         }
     };
@@ -70,9 +74,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        //=========================================Activate text fields
         txtStatus = (TextView) findViewById(R.id.txtStatus);
-        txtAcc = (TextView) findViewById(R.id.txtAcc);
-        txtGyro = (TextView) findViewById(R.id.txtGyro);
+        txtRRI = (TextView) findViewById(R.id.txtRRI);
+        txtGsr = (TextView) findViewById(R.id.txtGsr);
+        txtMtn = (TextView) findViewById(R.id.txtMtn);
+        //=========================================Activate buttons
+
+        //Button for HeartRate
         btnStart = (Button) findViewById(R.id.btnStart);
         btnStart.setOnClickListener(new OnClickListener() {
             @Override
@@ -81,9 +90,8 @@ public class MainActivity extends AppCompatActivity {
                 new HeartRateSubscriptionTask().execute();
             }
         });
-
         final WeakReference<Activity> reference = new WeakReference<Activity>(this);
-
+        //Button for connect to Band
         btnConsent = (Button) findViewById(R.id.btnConsent);
         btnConsent.setOnClickListener(new OnClickListener() {
             @SuppressWarnings("unchecked")
@@ -93,24 +101,32 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        btnAcc = (Button) findViewById(R.id.btnAcc);
-        btnAcc.setOnClickListener(new OnClickListener() {
+        btnRRI = (Button) findViewById(R.id.btnRRI);
+        btnRRI.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                txtAcc.setText("");
-                new AccelerometerSubscriptionTask().execute();
+                txtRRI.setText("");
+                new RRIntervalSubscriptionTask().execute();
             }
         });
 
-        btnGyro = (Button) findViewById(R.id.btnGyro);
-        btnGyro.setOnClickListener(new OnClickListener() {
+        btnGsr = (Button) findViewById(R.id.btnGsr);
+        btnGsr.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                txtGyro.setText("");
-                new GyroscopeSubscriptionTask().execute();
+                txtGsr.setText("");
+                new GsrSubscriptionTask().execute();
             }
         });
 
+        btnMtn = (Button) findViewById(R.id.btnMtn);
+        btnMtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                txtMtn.setText("");
+                new MtnSubscriptionTask().execute();
+            }
+        });
     }
 
     @Override
@@ -145,15 +161,20 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private class GyroscopeSubscriptionTask extends AsyncTask<Void, Void, Void> {
+    private class MtnSubscriptionTask extends AsyncTask<Void, Void, Void> {
         @Override
         protected Void doInBackground(Void... params) {
             try {
                 if (getConnectedBandClient()) {
-                    appendToUI_Gyro("Band is connected.\n");
-                    client.getSensorManager().registerGyroscopeEventListener(mGyroscopeEventListener, SampleRate.MS128);
+                    int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
+                    if (hardwareVersion >= 20) {
+                        appendToUI_Dist("Band is connected.\n");
+                        client.getSensorManager().registerDistanceEventListener(mDistanceListener);
+                    } else {
+                        appendToUI_Dist("The Gsr sensor is not supported with your Band version. Microsoft Band 2 is required.\n");
+                    }
                 } else {
-                    appendToUI_Gyro("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
+                    appendToUI_Dist("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
                 }
             } catch (BandException e) {
                 String exceptionMessage="";
@@ -168,24 +189,29 @@ public class MainActivity extends AppCompatActivity {
                         exceptionMessage = "Unknown error occured: " + e.getMessage() + "\n";
                         break;
                 }
-                appendToUI_Gyro(exceptionMessage);
+                appendToUI_Dist(exceptionMessage);
 
             } catch (Exception e) {
-                appendToUI_Gyro(e.getMessage());
+                appendToUI_Dist(e.getMessage());
             }
             return null;
         }
     }
 
-    private class AccelerometerSubscriptionTask extends AsyncTask<Void, Void, Void> {
+    private class GsrSubscriptionTask extends AsyncTask<Void, Void, Void> {
         @Override
         protected Void doInBackground(Void... params) {
             try {
                 if (getConnectedBandClient()) {
-                    appendToUI_Acc("Band is connected.\n");
-                    client.getSensorManager().registerAccelerometerEventListener(mAccelerometerEventListener, SampleRate.MS128);
+                    int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
+                    if (hardwareVersion >= 20) {
+                        appendToUI_Gsr("Band is connected.\n");
+                        client.getSensorManager().registerGsrEventListener(mGsrEventListener);
+                    } else {
+                        appendToUI_Gsr("The Gsr sensor is not supported with your Band version. Microsoft Band 2 is required.\n");
+                    }
                 } else {
-                    appendToUI_Acc("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
+                    appendToUI_Gsr("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
                 }
             } catch (BandException e) {
                 String exceptionMessage="";
@@ -200,10 +226,10 @@ public class MainActivity extends AppCompatActivity {
                         exceptionMessage = "Unknown error occured: " + e.getMessage() + "\n";
                         break;
                 }
-                appendToUI_Acc(exceptionMessage);
+                appendToUI_Gsr(exceptionMessage);
 
             } catch (Exception e) {
-                appendToUI_Acc(e.getMessage());
+                appendToUI_Gsr(e.getMessage());
             }
             return null;
         }
@@ -283,6 +309,50 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private class RRIntervalSubscriptionTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+            try {
+                if (getConnectedBandClient()) {
+                    int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
+                    if (hardwareVersion >= 20) {
+                        if (client.getSensorManager().getCurrentHeartRateConsent() == UserConsent.GRANTED) {
+                            client.getSensorManager().registerRRIntervalEventListener(mRRIntervalEventListener);
+                        } else {
+                            appendToUI("You have not given this application consent to access heart rate data yet."
+                                    + " Please press the Heart Rate Consent button.\n");
+                        }
+                    } else {
+                        appendToUI("The RR Interval sensor is not supported with your Band version. Microsoft Band 2 is required.\n");
+                    }
+                } else {
+                    appendToUI("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
+                }
+            } catch (BandException e) {
+                String exceptionMessage="";
+                switch (e.getErrorType()) {
+                    case UNSUPPORTED_SDK_VERSION_ERROR:
+                        exceptionMessage = "Microsoft Health BandService doesn't support your SDK Version. Please update to latest SDK.\n";
+                        break;
+                    case SERVICE_ERROR:
+                        exceptionMessage = "Microsoft Health BandService is not available. Please make sure Microsoft Health is installed and that you have the correct permissions.\n";
+                        break;
+                    default:
+                        exceptionMessage = "Unknown error occured: " + e.getMessage() + "\n";
+                        break;
+                }
+                appendToUI(exceptionMessage);
+
+            } catch (Exception e) {
+                appendToUI(e.getMessage());
+            }
+            return null;
+        }
+    }
+
+    //=========================================methods for writing data to text Field
+
+    // write HeartRate Data
     private void appendToUI(final String string) {
         this.runOnUiThread(new Runnable() {
             @Override
@@ -291,25 +361,36 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
-    private void appendToUI_Acc(final String string) {
+    // write Distance Data
+    private void appendToUI_Dist(final String string) {
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                txtAcc.setText(string);
+                txtMtn.setText(string);
+            }
+        });
+    }
+    // write Gsr Data
+    private void appendToUI_Gsr(final String string) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                txtGsr.setText(string);
+            }
+        });
+    }
+    //write RRI data
+    private void appendToUI_RR(final String string) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                txtRRI.setText(string);
             }
         });
     }
 
-    private void appendToUI_Gyro(final String string) {
-        this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                txtGyro.setText(string);
-            }
-        });
-    }
 
+    //=========================================Connect Smartphone and Band
     private boolean getConnectedBandClient() throws InterruptedException, BandException {
         if (client == null) {
             BandInfo[] devices = BandClientManager.getInstance().getPairedBands();
