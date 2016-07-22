@@ -167,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 if (getConnectedBandClient()) {
                     int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
-                    if (hardwareVersion >= 20) {
+                    if (hardwareVersion >= 16) {
                         appendToUI_Dist("Band is connected.\n");
                         client.getSensorManager().registerDistanceEventListener(mDistanceListener);
                     } else {
@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 if (getConnectedBandClient()) {
                     int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
-                    if (hardwareVersion >= 20) {
+                    if (hardwareVersion >= 16) {
                         appendToUI_Gsr("Band is connected.\n");
                         client.getSensorManager().registerGsrEventListener(mGsrEventListener);
                     } else {
@@ -315,7 +315,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 if (getConnectedBandClient()) {
                     int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
-                    if (hardwareVersion >= 20) {
+                    if (hardwareVersion >= 16) {
                         if (client.getSensorManager().getCurrentHeartRateConsent() == UserConsent.GRANTED) {
                             client.getSensorManager().registerRRIntervalEventListener(mRRIntervalEventListener);
                         } else {
