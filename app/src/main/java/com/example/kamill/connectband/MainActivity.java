@@ -10,6 +10,7 @@ import android.widget.TextView;
 import android.view.View.OnClickListener;
 
 import java.lang.ref.WeakReference;
+import java.util.UUID;
 
 import com.microsoft.band.BandClient;
 import com.microsoft.band.BandClientManager;
@@ -27,11 +28,17 @@ import com.microsoft.band.sensors.BandHeartRateEventListener;
 import com.microsoft.band.sensors.HeartRateConsentListener;
 import com.microsoft.band.sensors.BandRRIntervalEvent;
 import com.microsoft.band.sensors.BandRRIntervalEventListener;
+import com.microsoft.windowsazure.mobileservices.*;
+import com.microsoft.windowsazure.mobileservices.table.MobileServiceTable;
 
 public class MainActivity extends AppCompatActivity {
     private BandClient client = null;
-    private Button btnStart, btnConsent, btnMtn, btnRRI, btnGsr;
-    private TextView txtStatus, txtMtn, txtRRI, txtGsr;
+    private Button btnStart, btnConsent, btnMtn, btnRRI, btnGsr, btnHR, btnTile, btnCTile;
+    private TextView txtStatus, txtMtn, txtRRI, txtGsr, txtHR, txtTile;
+
+    private static final UUID tileId = UUID.fromString("cc0D508F-70A3-47D4-BBA3-812BADB1F8Aa");
+    private static final UUID pageId1 = UUID.fromString("b1234567-89ab-cdef-0123-456789abcd00");
+
 
     private BandHeartRateEventListener mHeartRateEventListener = new BandHeartRateEventListener() {
         @Override
@@ -69,6 +76,13 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private BandDistanceEventListener dDistanceListener = new BandDistanceEventListener() {
+        @Override
+        public void onBandDistanceChanged(BandDistanceEvent bandDistanceEvent) {
+            appendToUI_Pat(String.format("Patient HeartRate: " + 70));
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -79,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
         txtRRI = (TextView) findViewById(R.id.txtRRI);
         txtGsr = (TextView) findViewById(R.id.txtGsr);
         txtMtn = (TextView) findViewById(R.id.txtMtn);
+        txtHR = (TextView) findViewById(R.id.txtHR);
+        txtTile = (TextView) findViewById(R.id.txtTile);
         //=========================================Activate buttons
 
         //Button for HeartRate
@@ -127,6 +143,24 @@ public class MainActivity extends AppCompatActivity {
                 new MtnSubscriptionTask().execute();
             }
         });
+
+        btnHR = (Button) findViewById(R.id.btnHR);
+        btnHR.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                txtHR.setText("");
+                new HRSubscriptionTask().execute();
+            }
+        });
+
+        btnTile = (Button) findViewById(R.id.btnTile);
+        btnTile.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                disableButtons();
+                new StartTask().execute();
+            }
+        });
     }
 
     @Override
@@ -159,6 +193,43 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         super.onDestroy();
+    }
+
+    private class HRSubscriptionTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+            try {
+                if (getConnectedBandClient()) {
+                    int hardwareVersion = Integer.parseInt(client.getHardwareVersion().await());
+                    if (hardwareVersion >= 16) {
+                        appendToUI_Pat("Band is connected.\n");
+                        client.getSensorManager().registerDistanceEventListener(mDistanceListener);
+                    } else {
+                        appendToUI_Pat("The Gsr sensor is not supported with your Band version. Microsoft Band 2 is required.\n");
+                    }
+                } else {
+                    appendToUI_Pat("Band isn't connected. Please make sure bluetooth is on and the band is in range.\n");
+                }
+            } catch (BandException e) {
+                String exceptionMessage="";
+                switch (e.getErrorType()) {
+                    case UNSUPPORTED_SDK_VERSION_ERROR:
+                        exceptionMessage = "Microsoft Health BandService doesn't support your SDK Version. Please update to latest SDK.\n";
+                        break;
+                    case SERVICE_ERROR:
+                        exceptionMessage = "Microsoft Health BandService is not available. Please make sure Microsoft Health is installed and that you have the correct permissions.\n";
+                        break;
+                    default:
+                        exceptionMessage = "Unknown error occured: " + e.getMessage() + "\n";
+                        break;
+                }
+                appendToUI_Pat(exceptionMessage);
+
+            } catch (Exception e) {
+                appendToUI_Pat(e.getMessage());
+            }
+            return null;
+        }
     }
 
     private class MtnSubscriptionTask extends AsyncTask<Void, Void, Void> {
@@ -385,6 +456,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 txtRRI.setText(string);
+            }
+        });
+    }
+    //write Patient data
+    private void appendToUI_Pat(final String string) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                txtHR.setText(string);
             }
         });
     }
