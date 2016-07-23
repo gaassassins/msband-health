@@ -1,4 +1,4 @@
-# MSBand Health
+# MSBand Healther
 “Healther” is an application to monitor the state of human health, and timely alerts about a dan- gerous situation arises, loved ones and the at-tending physician.
 
 ---
